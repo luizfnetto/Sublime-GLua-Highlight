@@ -10,6 +10,7 @@
 Get the derma controls
 Returns: match String
 ---------------------------------------------------------------------------*/
+
 local function getDermaControls()
 	local controls = {}
 	for _, ctrl in pairs(derma.GetControlList()) do
@@ -141,13 +142,14 @@ local function getHooks()
 
 	hooks["SWEP"] = hooksFromTable(weapons.Get("weapon_base")) -- All the weapon hooks
 	hooks["TOOL"] = hooksFromTable(weapons.Get("gmod_tool")) -- All the tool hooks
-	hooks["GAMEMODE"] = hooksFromTable(GAMEMODE.BaseClass) -- All the gamemode hooks
+	hooks["GAMEMODE"] = table.Merge(hooksFromTable(GAMEMODE.BaseClass), {"ShowHelp", "ShowSpare1", "ShowSpare2"})  -- All the gamemode hooks, some added manually
 	hooks["EFFECT"] = {"Init", "Think", "Render"} -- Effects. Hard coded until a method is found to generate them
 
 	-- Entities
 	hooks["ENT"] = hooksFromTable(scripted_ents.Get("base_anim"))
 	hooks["ENT"] = hooksFromTable(scripted_ents.Get("base_ai"), hooks["ENT"])
 	hooks["ENT"] = hooksFromTable(scripted_ents.Get("widget_base"), hooks["ENT"])
+	table.insert(hooks["ENT"], "Category")
 	//hooks["ENT"] = hooksFromTable(scripted_ents.Get("base_vehicle"), hooks["ENT"]) -- Gone in gmod 13?
 
 	if SERVER then -- The server only entity types
@@ -283,6 +285,9 @@ local function GenerateSublimeStrings()
 					partTable[parts[i]] = partTable[parts[i]] or {}
 					partTable = partTable[parts[i]]
 				end
+				if num == #parts then
+					partTable[true] = true -- marker that states that this in itself is an enum
+				end
 			end
 		end
 
@@ -291,13 +296,19 @@ local function GenerateSublimeStrings()
 
 	-- Convert enumerations table to sublime Text recognized string
 	local function enumString(tbl)
-
 		local enums = ""
 		for k,v in pairs(tbl) do
-			if table.Count(v) > 1 then
-				enums = enums .. string.upper(k) .. "_(" .. enumString(v) .. ")|"
-			elseif table.Count(v) > 0 then
+			if k == true then continue end -- marker that states that this in itself is an enum
+			local count = table.Count(v)
+
+			if count > 2 and v[true] then -- Enum exists of itself and has multiple children
+				enums = enums .. string.upper(k) .. "(|_(" .. enumString(v) .. "))|"
+			elseif count == 2 and v[true] then -- Enum exists and has one child
 				enums = enums .. string.upper(k) .. "(|_" .. enumString(v) .. ")|"
+			elseif count > 1 and not v[true] then -- Enum doesn't exist, but has multiple children
+				enums = enums .. string.upper(k) .. "_(" .. enumString(v) .. ")|"
+			elseif count == 1 and not v[true] then -- Enum doesn't exist and has one child
+				enums = enums .. string.upper(k) .. "_" .. enumString(v) .. "|"
 			else
 				enums = enums .. string.upper(k) .. "|"
 			end
@@ -306,8 +317,40 @@ local function GenerateSublimeStrings()
 		return string.sub(enums, 1, -2)
 	end
 
-	file.Write("sublime_1enums.txt", "(?&lt;![^.]\\.|:)\\b("..enumString(groupedEnums())..")\\b|(?&lt;![.])\\.{3}(?!\\.)")
+	-- enums made by cunts, because SOMEONE decided that those enums should be in table format
+	local cuntEnums =
+		{ "TEXFILTER\\.NONE"
+		, "TEXFILTER\\.POINT"
+		, "TEXFILTER\\.LINEAR"
+		, "TEXFILTER\\.ANISOTROPIC"
+		, "SENSORBONE\\.SHOULDER_RIGHT"
+		, "SENSORBONE\\.SHOULDER_LEFT"
+		, "SENSORBONE\\.HIP"
+		, "SENSORBONE\\.ELBOW_RIGHT"
+		, "SENSORBONE\\.KNEE_RIGHT"
+		, "SENSORBONE\\.WRIST_RIGHT"
+		, "SENSORBONE\\.ANKLE_LEFT"
+		, "SENSORBONE\\.FOOT_LEFT"
+		, "SENSORBONE\\.WRIST_LEFT"
+		, "SENSORBONE\\.FOOT_RIGHT"
+		, "SENSORBONE\\.HAND_RIGHT"
+		, "SENSORBONE\\.SHOULDER"
+		, "SENSORBONE\\.HIP_LEFT"
+		, "SENSORBONE\\.HIP_RIGHT"
+		, "SENSORBONE\\.HAND_LEFT"
+		, "SENSORBONE\\.ANKLE_RIGHT"
+		, "SENSORBONE\\.SPINE"
+		, "SENSORBONE\\.ELBOW_LEFT"
+		, "SENSORBONE\\.KNEE_LEFT"
+		, "SENSORBONE\\.HEAD"
+		, "SCREENFADE\\.IN"
+		, "SCREENFADE\\.OUT"
+		, "SCREENFADE\\.MODULATE"
+		, "SCREENFADE\\.STAYOUT"
+		, "SCREENFADE\\.PURGE"
+		}
 
+	file.Write("sublime_1enums.txt", "(?&lt;![^.]\\.|:)\\b(" .. table.concat(cuntEnums,"|") .. "|" .. enumString(groupedEnums()) .. ")\\b|(?&lt;![.])\\.{3}(?!\\.)")
 
 	-- Libraries
 	local strLibraries = "\\b("
